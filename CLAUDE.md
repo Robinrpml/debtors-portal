@@ -20,16 +20,16 @@ Read `AGENTS.md` — this Next.js version differs from older training data (e.g.
    `ascora_invoice_ids` so syncs never wipe them.
 7. **Notes save locally first, then post to Ascora** (`notes-actions.ts`). Failed/skipped pushes keep the note and can be retried.
 8. Record admin actions with `audit()`.
+9. Schema changes: add a new file in `supabase/migrations/` (timestamped) and apply it — never edit an applied migration.
 10. **On Hold lives in Ascora.** The portal mirrors `onHold` / `billingCustomerOnHold` (nightly, webhook, after writes). Writing goes through
     `setCustomerOnHold` (read full record, change onHold, post back, re-read and diff) and is gated by `ASCORA_HOLD_WRITE_ENABLED`.
-9. Schema changes: add a new file in `supabase/migrations/` (timestamped) and apply it — never edit an applied migration.
 
 ## Map
 
 - `src/app/(app)/` — signed-in pages: Debtors (`page.tsx` + `dashboard.tsx`), `follow-ups`, `admin/users|mappings|settings`
 - `src/app/(auth)/` — login, forgot-password, set-password; `src/app/auth/confirm` handles emailed links
 - `src/app/setup` — one-time first-Owner bootstrap (needs `BOOTSTRAP_TOKEN`; 404s once an Owner exists)
-- `src/app/api/cron/[job]` — `sync-xero`, `sync-remittances`, `sync-ascora-customers`, `sync-all`
+- `src/app/api/cron/[job]` — `sync-xero`, `sync-remittances`, `sync-ascora-customers`, `sync-ascora-holds`, `sync-all`
 - `src/app/api/xero/connect|callback` — Owner-only OAuth; tokens AES-GCM encrypted in `integration_secrets`
 - `src/app/api/webhooks/ascora` — captures Ascora invoice IDs for deep links
 - `src/lib/` — `xero.ts`, `ascora.ts`, `missive.ts`, `sync/*`, `aging.ts`, `auth.ts`, `data.ts`
