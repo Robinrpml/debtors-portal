@@ -1,0 +1,44 @@
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
+
+// Paths reachable without a session. Everything else redirects to /login.
+const PUBLIC_PATHS = ["/login", "/forgot-password", "/auth/confirm", "/setup"];
+// Machine endpoints authenticate themselves (CRON_SECRET, webhook secret, OAuth state).
+const SELF_AUTH_PREFIXES = ["/api/cron/", "/api/webhooks/"];
+
+export async function proxy(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  if (SELF_AUTH_PREFIXES.some((p) => path.startsWith(p))) return NextResponse.next();
+
+  let response = NextResponse.next({ request });
+  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+      },
+    },
+  });
+
+  // Refreshes the session cookie when needed and verifies the JWT.
+  const { data } = await supabase.auth.getClaims();
+  const signedIn = !!data?.claims?.sub;
+  const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + "/"));
+
+  if (!signedIn && !isPublic) {
+    if (path.startsWith("/api/")) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = path === "/" ? "" : `?next=${encodeURIComponent(path)}`;
+    return NextResponse.redirect(url);
+  }
+  return response;
+}
+
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|apple-icon.png|brand/|robots.txt).*)"],
+};

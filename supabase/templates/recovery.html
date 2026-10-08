@@ -1,0 +1,8 @@
+<!-- Supabase → Authentication → Emails → Reset Password. Subject: Reset your Debtors portal password -->
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#231f20">
+  <div style="height:3px;background:linear-gradient(90deg,#6ccff6 0 33%,#e2412e 33% 66%,#939598 66%);margin-bottom:20px"></div>
+  <h2 style="margin:0 0 12px">Reset your password</h2>
+  <p>Someone asked to reset the password for the Precision Thermal Debtors portal account {{ .Email }}.</p>
+  <p><a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/set-password" style="display:inline-block;background:#231f20;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Choose a new password</a></p>
+  <p style="color:#5e6166;font-size:13px">The link works once and expires in one hour. If you didn't ask for this, ignore this email.</p>
+</div>
