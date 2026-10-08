@@ -32,6 +32,9 @@ export async function syncAscoraCustomers(limit = 150) {
           ascora_match: r.match,
           ascora_customer_id: r.match === "auto" ? r.best!.customerId : null,
           ascora_customer_name: r.best?.customerName ?? null,
+          ...(r.match === "auto"
+            ? { ascora_on_hold: !!r.best!.onHold, ascora_billing_on_hold: !!r.best!.billingCustomerOnHold, ascora_hold_checked_at: new Date().toISOString() }
+            : {}),
           ascora_candidates: r.candidates.map((x) => ({ id: x.customerId, name: x.customerName, email: x.emailAddress ?? null })),
           ascora_checked_at: new Date().toISOString(),
         })

@@ -17,7 +17,15 @@ export async function selectAll<T>(
 }
 
 export type DashInvoice = { n: string; c: string; b: string | null; d: string | null; a: number; t: "invoice" | "credit" };
-export type DashCustomer = { id: string; name: string; email: string | null; brandOverride: string | null; ascoraId: string | null };
+export type DashCustomer = {
+  id: string;
+  name: string;
+  email: string | null;
+  brandOverride: string | null;
+  ascoraId: string | null;
+  onHold: boolean;
+  billingOnHold: boolean;
+};
 export type DashPayment = { c: string; d: string; a: number };
 export type DashRemittance = {
   id: string;
@@ -45,16 +53,19 @@ export type DashboardData = {
   noteStats: DashNoteStat[];
   ascoraInvoiceIds: Record<string, string>;
   links: { customer: string | null; invoice: string | null };
+  holdWrite: boolean;
 };
 
-export async function loadDashboard(db: SupabaseClient, asOfFallback: string, links: DashboardData["links"]): Promise<DashboardData> {
+export async function loadDashboard(db: SupabaseClient, asOfFallback: string, links: DashboardData["links"], holdWrite = false): Promise<DashboardData> {
   const [snap, invoices, customers, payments, remits, notes, ascoraIds] = await Promise.all([
     db.from("app_state").select("value").eq("key", "snapshot").maybeSingle(),
     selectAll<{ number: string; customer_id: string; brand: string | null; due_date: string | null; amount_due: number; doc_type: "invoice" | "credit" }>((f, t) =>
       db.from("invoices").select("number,customer_id,brand,due_date,amount_due,doc_type").order("xero_invoice_id").range(f, t),
     ),
-    selectAll<{ id: string; name: string; email: string | null; brand_override: string | null; ascora_customer_id: string | null; ascora_match: string }>((f, t) =>
-      db.from("customers").select("id,name,email,brand_override,ascora_customer_id,ascora_match").order("id").range(f, t),
+    selectAll<{
+      id: string; name: string; email: string | null; brand_override: string | null; ascora_customer_id: string | null; ascora_match: string; ascora_on_hold: boolean; ascora_billing_on_hold: boolean;
+    }>((f, t) =>
+      db.from("customers").select("id,name,email,brand_override,ascora_customer_id,ascora_match,ascora_on_hold,ascora_billing_on_hold").order("id").range(f, t),
     ),
     selectAll<{ customer_id: string; paid_date: string; amount: number }>((f, t) => db.from("payments").select("customer_id,paid_date,amount").order("id").range(f, t)),
     db.from("remittances").select("id,customer_id,customer_name_raw,kind,ref,doc_date,amount,invoice_numbers,note,missive_url,inbox").eq("status", "open").order("doc_date", { ascending: false }),
@@ -84,7 +95,18 @@ export async function loadDashboard(db: SupabaseClient, asOfFallback: string, li
     invoices: invoices.map((i) => ({ n: i.number, c: i.customer_id, b: i.brand, d: i.due_date, a: Number(i.amount_due), t: i.doc_type })),
     customers: customers
       .filter((c) => used.has(c.id))
-      .map((c) => ({ id: c.id, name: c.name, email: c.email, brandOverride: c.brand_override, ascoraId: ["auto", "confirmed"].includes(c.ascora_match) ? c.ascora_customer_id : null })),
+      .map((c) => {
+        const linked = ["auto", "confirmed"].includes(c.ascora_match);
+        return {
+          id: c.id,
+          name: c.name,
+          email: c.email,
+          brandOverride: c.brand_override,
+          ascoraId: linked ? c.ascora_customer_id : null,
+          onHold: linked && c.ascora_on_hold,
+          billingOnHold: linked && c.ascora_billing_on_hold,
+        };
+      }),
     payments: payments.filter((p) => used.has(p.customer_id)).map((p) => ({ c: p.customer_id, d: p.paid_date, a: Number(p.amount) })),
     remittances: (remits.data ?? []).map((r) => ({
       id: r.id,
@@ -102,5 +124,6 @@ export async function loadDashboard(db: SupabaseClient, asOfFallback: string, li
     noteStats: [...stats.values()],
     ascoraInvoiceIds: Object.fromEntries(ascoraIds.map((x) => [x.invoice_number.toLowerCase(), x.ascora_invoice_id])),
     links,
+    holdWrite,
   };
 }

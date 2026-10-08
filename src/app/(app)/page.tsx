@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { requireUser, isManagerRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { loadDashboard } from "@/lib/data";
-import { linkTemplates } from "@/lib/ascora";
+import { linkTemplates, holdWriteEnabled, ascoraConfigured } from "@/lib/ascora";
 import { melbourneToday } from "@/lib/aging";
 import { Dashboard } from "./dashboard";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function DebtorsPage() {
   const me = await requireUser();
   const db = await createClient();
-  const data = await loadDashboard(db, melbourneToday(), linkTemplates());
+  const data = await loadDashboard(db, melbourneToday(), linkTemplates(), ascoraConfigured() && holdWriteEnabled());
   return (
     <Dashboard
       data={data}

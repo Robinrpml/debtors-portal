@@ -4,6 +4,7 @@ import { recordRun } from "@/lib/sync/run";
 import { syncXero } from "@/lib/sync/xero-sync";
 import { syncAscoraCustomers } from "@/lib/sync/ascora-customers";
 import { syncRemittances } from "@/lib/sync/remittance-sync";
+import { syncAscoraHolds } from "@/lib/sync/ascora-holds";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -12,12 +13,14 @@ const JOBS: Record<string, () => Promise<Record<string, unknown>>> = {
   "sync-xero": syncXero,
   "sync-ascora-customers": () => syncAscoraCustomers(),
   "sync-remittances": syncRemittances,
+  "sync-ascora-holds": syncAscoraHolds,
   // Runs everything in order; used by the daily Vercel cron.
   "sync-all": async () => {
     const xero = await recordRun("sync-xero", syncXero);
     const remittances = await recordRun("sync-remittances", syncRemittances);
     const ascora = await recordRun("sync-ascora-customers", () => syncAscoraCustomers());
-    return { xero: xero.ok, remittances: remittances.ok, ascora: ascora.ok };
+    const holds = await recordRun("sync-ascora-holds", syncAscoraHolds);
+    return { xero: xero.ok, remittances: remittances.ok, ascora: ascora.ok, holds: holds.ok };
   },
 };
 

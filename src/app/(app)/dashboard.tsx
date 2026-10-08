@@ -6,6 +6,7 @@ import { money, money0, fmtDate, fmtDateTime, fillTemplate } from "@/lib/format"
 import type { DashboardData, DashRemittance } from "@/lib/data";
 import { dismissRemittance } from "./notes-actions";
 import { NotesPanel } from "./notes-panel";
+import { HoldControl } from "./hold-control";
 
 type Me = { id: string; name: string; manager: boolean; brandAccess: string };
 type BrandFilter = "all" | "DND" | "Gippsland" | "none";
@@ -16,6 +17,8 @@ type Row = {
   name: string;
   email: string | null;
   ascoraId: string | null;
+  onHold: boolean;
+  billingOnHold: boolean;
   inv: Inv[];
   b: Record<BucketKey, number>;
   total: number;
@@ -46,6 +49,7 @@ export function Dashboard({ data, me }: { data: DashboardData; me: Me }) {
   const [brand, setBrand] = useState<BrandFilter>("all");
   const [q, setQ] = useState("");
   const [overdueOnly, setOverdueOnly] = useState(false);
+  const [holdOnly, setHoldOnly] = useState(false);
   const [sort, setSort] = useState("over");
   const [asc, setAsc] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -129,6 +133,8 @@ export function Dashboard({ data, me }: { data: DashboardData; me: Me }) {
         name: c.name,
         email: c.email,
         ascoraId: c.ascoraId,
+        onHold: c.onHold,
+        billingOnHold: c.billingOnHold,
         inv,
         b,
         total,
@@ -147,10 +153,13 @@ export function Dashboard({ data, me }: { data: DashboardData; me: Me }) {
     return rows;
   }, [data, brand, asOf, custById]);
 
+  const holdCount = useMemo(() => all.filter((x) => x.onHold || x.billingOnHold).length, [all]);
+
   const rows = useMemo(() => {
     const qq = q.trim().toLowerCase();
     const r = all.filter((x) => {
       if (overdueOnly && x.over <= 0.005) return false;
+      if (holdOnly && !x.onHold && !x.billingOnHold) return false;
       if (qq && !x.name.toLowerCase().includes(qq) && !x.inv.some((i) => i.n.toLowerCase().includes(qq))) return false;
       return true;
     });
@@ -167,7 +176,7 @@ export function Dashboard({ data, me }: { data: DashboardData; me: Me }) {
       const c = A < B ? -1 : A > B ? 1 : 0;
       return asc ? c : -c;
     });
-  }, [all, q, overdueOnly, sort, asc]);
+  }, [all, q, overdueOnly, holdOnly, sort, asc]);
 
   const T: Record<BucketKey, number> = { C: 0, L: 0, "1": 0, "2": 0, "3": 0, O: 0 };
   let total = 0, over = 0, s60 = 0, rem = 0;
@@ -247,6 +256,10 @@ export function Dashboard({ data, me }: { data: DashboardData; me: Me }) {
         <input className="search" type="search" placeholder="Search customer or invoice number" aria-label="Search customers" value={q} onChange={(e) => setQ(e.target.value)} />
         <label className="chk">
           <input type="checkbox" checked={overdueOnly} onChange={(e) => setOverdueOnly(e.target.checked)} /> Overdue customers only
+        </label>
+        <label className="chk">
+          <input type="checkbox" checked={holdOnly} onChange={(e) => setHoldOnly(e.target.checked)} /> On hold only
+          {holdCount > 0 && <span className="pill hold" style={{ marginLeft: 2 }}>{holdCount}</span>}
         </label>
       </div>
 
@@ -380,6 +393,8 @@ export function Dashboard({ data, me }: { data: DashboardData; me: Me }) {
                           ) : (
                             <span>{r.name}</span>
                           )}
+                          {r.onHold && <span className="pill hold" title="On hold in Ascora">On hold</span>}
+                          {!r.onHold && r.billingOnHold && <span className="pill hold" title="This customer's billing customer is on hold in Ascora">Billing on hold</span>}
                           {r.remits.some((x) => x.kind === "remittance") && <span className="pill rem">Remitted {money0.format(r.remAmt)}</span>}
                           {r.remits.some((x) => x.kind === "claim") && <span className="pill clm">Claim approved</span>}
                           {r.total < 0 && <span className="pill cr">In credit</span>}
@@ -430,6 +445,14 @@ export function Dashboard({ data, me }: { data: DashboardData; me: Me }) {
                                   <a className="ext" href={link} target="_blank" rel="noopener noreferrer">Customer in Ascora</a>
                                 )}
                               </div>
+                              <HoldControl
+                                customerId={r.id}
+                                customerName={r.name}
+                                onHold={r.onHold}
+                                billingOnHold={r.billingOnHold}
+                                linked={!!r.ascoraId}
+                                canEdit={me.manager && data.holdWrite}
+                              />
                               <PayBlock r={r} asOf={asOf} paySince={data.paySince} />
                               <div style={{ overflowX: "auto" }}>
                                 <table className="inv-table">

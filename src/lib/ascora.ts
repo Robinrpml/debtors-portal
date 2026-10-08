@@ -32,7 +32,43 @@ export type AscoraCustomer = {
   contactFirstName?: string;
   contactLastName?: string;
   emailAddress?: string;
+  onHold?: boolean;
+  billingCustomerOnHold?: boolean;
 };
+
+/** GET /Customers/Customer/{id} — the full customer record as Ascora returns it. */
+export async function getCustomer(id: string): Promise<(AscoraCustomer & Record<string, unknown>) | null> {
+  const json = await ascora<{ success: boolean; customer: (AscoraCustomer & Record<string, unknown>) | null; message?: string }>(
+    `/Customers/Customer/${encodeURIComponent(id)}`,
+  );
+  return json?.success ? json.customer : null;
+}
+
+/** Writing On Hold is off until ASCORA_HOLD_WRITE_ENABLED=true (after testing on a dummy customer). */
+export const holdWriteEnabled = () => optionalEnv("ASCORA_HOLD_WRITE_ENABLED") === "true";
+
+/**
+ * Set On Hold via POST /Customers/Customer. Ascora's docs don't say whether omitted fields are kept,
+ * so we read the full record, change only onHold, and send everything back.
+ * Afterwards we re-read and compare, so a side effect is reported rather than silently accepted.
+ */
+export async function setCustomerOnHold(id: string, onHold: boolean): Promise<{ onHold: boolean; billingCustomerOnHold: boolean; changedFields: string[] }> {
+  const before = await getCustomer(id);
+  if (!before) throw new Error("Ascora customer not found");
+  const body = { ...before, customerId: id, onHold };
+  const json = await ascora<{ success: boolean; message?: string; customer?: AscoraCustomer }>(`/Customers/Customer`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!json?.success) throw new Error(json?.message || "Ascora rejected the update");
+
+  const after = await getCustomer(id);
+  if (!after) throw new Error("Couldn't re-read the customer from Ascora");
+  const changedFields = Object.keys(before).filter(
+    (k) => k !== "onHold" && JSON.stringify(before[k]) !== JSON.stringify((after as Record<string, unknown>)[k]),
+  );
+  return { onHold: !!after.onHold, billingCustomerOnHold: !!after.billingCustomerOnHold, changedFields };
+}
 
 export async function searchCustomers(filterText: string): Promise<AscoraCustomer[]> {
   const q = new URLSearchParams({ FilterText: filterText, SiteBillingType: "All", PageSize: "20", Page: "1" });

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { optionalEnv } from "@/lib/env";
 import { accountsAddresses } from "@/lib/missive";
 import { fmtDateTime } from "@/lib/format";
-import { RunButtons, DisconnectButton } from "./controls";
+import { RunButtons, DisconnectButton, HoldWriteTest } from "./controls";
 
 export const metadata: Metadata = { title: "Settings" };
 export const dynamic = "force-dynamic";
@@ -27,6 +27,7 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
     { name: "Ascora API", ok: !!optionalEnv("ASCORA_API_KEY"), detail: "ASCORA_API_KEY — customer matching and notes" },
     { name: "Ascora customer links", ok: !!optionalEnv("ASCORA_CUSTOMER_URL"), detail: "ASCORA_CUSTOMER_URL" },
     { name: "Ascora invoice links", ok: !!optionalEnv("ASCORA_INVOICE_URL"), detail: "ASCORA_INVOICE_URL (+ webhooks for invoice IDs)" },
+    { name: "Change On Hold", ok: optionalEnv("ASCORA_HOLD_WRITE_ENABLED") === "true", detail: "ASCORA_HOLD_WRITE_ENABLED=true — lets Managers put customers on hold / release in Ascora" },
     { name: "Missive", ok: !!optionalEnv("MISSIVE_API_TOKEN"), detail: `MISSIVE_API_TOKEN — checks ${accountsAddresses().join(", ")}` },
     { name: "Claude API", ok: !!optionalEnv("ANTHROPIC_API_KEY"), detail: "ANTHROPIC_API_KEY — reads remittance emails" },
     { name: "Cron secret", ok: !!optionalEnv("CRON_SECRET"), detail: "CRON_SECRET — scheduled syncs" },
@@ -65,6 +66,20 @@ export default async function SettingsPage(props: PageProps<"/admin/settings">) 
         </div>
         <RunButtons />
       </section>
+
+      {owner && (
+        <section className="panel">
+          <div className="panel-head">
+            <h2>Test On Hold writing</h2>
+            <span className="status">Owner only</span>
+          </div>
+          <p className="muted small" style={{ margin: 0, maxWidth: 760 }}>
+            Ascora&apos;s docs don&apos;t say whether updating a customer keeps the fields we don&apos;t send. This puts a test customer on hold and
+            straight back, then checks nothing else changed. Use a dummy customer, not a real one.
+          </p>
+          <HoldWriteTest />
+        </section>
+      )}
 
       <section className="panel">
         <h2>Connections</h2>

@@ -242,3 +242,12 @@ details > summary { cursor: pointer; }
   .logo .app { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---------- On Hold (Ascora) ---------- */
+.pill.hold { background: var(--bad); color: #fff; }
+.hold-box { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); max-width: 560px; }
+.hold-box.on { border-color: var(--bad); background: var(--bad-bg); }
+.hold-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.hold-state { font-weight: 600; font-size: 13px; color: var(--muted); }
+.hold-state.on { color: var(--bad); }
+.hold-confirm { display: grid; gap: 8px; }
